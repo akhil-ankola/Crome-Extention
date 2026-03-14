@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Web Page Notes</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="page-wrapper">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>📝</span>
+        <span>Web Page Notes</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-link active" data-section="appearance">🎨 Appearance</a>
+        <a class="nav-link" data-section="indicator">🔔 Indicator</a>
+        <a class="nav-link" data-section="data">📦 Data</a>
+        <a class="nav-link" data-section="about">ℹ About</a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <!-- Appearance -->
+      <section class="settings-section active" id="section-appearance">
+        <h1 class="section-title">Appearance</h1>
+        <p class="section-desc">Customize how Web Page Notes looks.</p>
+
+        <div class="setting-group">
+          <div class="setting-label">Theme</div>
+          <div class="theme-cards">
+            <label class="theme-card" data-value="light">
+              <input type="radio" name="theme" value="light" />
+              <div class="theme-preview light-preview">
+                <div class="tp-bar"></div>
+                <div class="tp-content">
+                  <div class="tp-line long"></div>
+                  <div class="tp-line short"></div>
+                </div>
+              </div>
+              <span class="theme-name">Light</span>
+            </label>
+            <label class="theme-card" data-value="dark">
+              <input type="radio" name="theme" value="dark" />
+              <div class="theme-preview dark-preview">
+                <div class="tp-bar"></div>
+                <div class="tp-content">
+                  <div class="tp-line long"></div>
+                  <div class="tp-line short"></div>
+                </div>
+              </div>
+              <span class="theme-name">Dark</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Indicator -->
+      <section class="settings-section" id="section-indicator">
+        <h1 class="section-title">Indicator</h1>
+        <p class="section-desc">Choose how to show when a page has notes.</p>
+
+        <div class="setting-group">
+          <div class="setting-label">Notification Style</div>
+          <div class="radio-group">
+            <label class="radio-card">
+              <input type="radio" name="indicator" value="badge" />
+              <div class="radio-content">
+                <span class="radio-icon">🏷</span>
+                <div>
+                  <div class="radio-title">Badge Counter</div>
+                  <div class="radio-sub">Shows a number badge on the extension icon</div>
+                </div>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="indicator" value="none" />
+              <div class="radio-content">
+                <span class="radio-icon">🔕</span>
+                <div>
+                  <div class="radio-title">No Indicator</div>
+                  <div class="radio-sub">Don't show any indicator</div>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data -->
+      <section class="settings-section" id="section-data">
+        <h1 class="section-title">Data Management</h1>
+        <p class="section-desc">Export, import, or delete your notes and highlights.</p>
+
+        <div class="data-cards">
+          <div class="data-card">
+            <div class="data-card-icon">📤</div>
+            <div class="data-card-info">
+              <div class="data-card-title">Export Notes</div>
+              <div class="data-card-sub">Download all notes and highlights as a JSON file</div>
+            </div>
+            <button class="data-btn primary" id="exportBtn">Export</button>
+          </div>
+
+          <div class="data-card">
+            <div class="data-card-icon">📥</div>
+            <div class="data-card-info">
+              <div class="data-card-title">Import Notes</div>
+              <div class="data-card-sub">Restore from a previously exported JSON file</div>
+            </div>
+            <button class="data-btn" id="importBtn">Import</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" />
+          </div>
+
+          <div class="data-card danger-card">
+            <div class="data-card-icon">🗑</div>
+            <div class="data-card-info">
+              <div class="data-card-title">Delete All Data</div>
+              <div class="data-card-sub">Permanently delete all notes and highlights</div>
+            </div>
+            <button class="data-btn danger" id="deleteAllBtn">Delete All</button>
+          </div>
+        </div>
+
+        <div class="storage-info" id="storageInfo">
+          <div class="si-label">Storage Used</div>
+          <div class="si-bar"><div class="si-fill" id="siFill"></div></div>
+          <div class="si-text" id="siText">Calculating…</div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="settings-section" id="section-about">
+        <h1 class="section-title">About</h1>
+        <div class="about-card">
+          <div class="about-icon">📝</div>
+          <div class="about-name">Web Page Notes</div>
+          <div class="about-version">Version 1.0.0</div>
+          <div class="about-desc">
+            A privacy-first note-taking and highlighting extension. All data is stored locally in your browser — nothing ever leaves your device.
+          </div>
+          <div class="about-features">
+            <div class="af-item">✓ Page notes per URL</div>
+            <div class="af-item">✓ Text highlighting with color</div>
+            <div class="af-item">✓ Sidebar panel</div>
+            <div class="af-item">✓ Export & import</div>
+            <div class="af-item">✓ Works fully offline</div>
+          </div>
+          <div class="shortcut-info">
+            Keyboard shortcut: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd>
+          </div>
+        </div>
+      </section>
+
+      <div class="save-bar">
+        <span class="save-status" id="saveStatus"></span>
+        <button class="save-btn" id="saveBtn">Save Settings</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="../utils/storage.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

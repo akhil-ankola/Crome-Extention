@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Notes — Web Page Notes</title>
+  <link rel="stylesheet" href="notes.css" />
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="page-header">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">📝</span>
+          <span class="logo-text">Web Page Notes</span>
+        </div>
+        <div class="header-actions">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input type="text" id="searchInput" placeholder="Search notes…" autocomplete="off" />
+          </div>
+          <button class="header-btn" id="settingsBtn">⚙ Settings</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Stats bar -->
+      <div class="stats-bar">
+        <div class="stat">
+          <span class="stat-num" id="totalNotes">0</span>
+          <span class="stat-label">Notes</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num" id="totalHighlights">0</span>
+          <span class="stat-label">Highlights</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num" id="totalPages">0</span>
+          <span class="stat-label">Pages</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-row">
+        <button class="tab-btn active" data-tab="notes">Notes</button>
+        <button class="tab-btn" data-tab="highlights">Highlights</button>
+      </div>
+
+      <!-- Notes list -->
+      <div id="notesTab" class="tab-content">
+        <div id="notesList" class="notes-grid"></div>
+        <div id="notesEmpty" class="empty-state" style="display:none">
+          <div class="empty-icon">📓</div>
+          <div class="empty-title">No notes yet</div>
+          <div class="empty-sub">Visit a page and click the extension icon to add a note.</div>
+        </div>
+      </div>
+
+      <!-- Highlights list -->
+      <div id="highlightsTab" class="tab-content" style="display:none">
+        <div id="highlightsList" class="notes-grid"></div>
+        <div id="hlEmpty" class="empty-state" style="display:none">
+          <div class="empty-icon">✦</div>
+          <div class="empty-title">No highlights yet</div>
+          <div class="empty-sub">Select text on any page and click the highlight button.</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Edit Note</h2>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-url" id="modalUrl"></div>
+      <textarea id="modalTextarea" class="modal-textarea"></textarea>
+      <div class="modal-actions">
+        <button class="mbtn secondary" id="modalCancel">Cancel</button>
+        <button class="mbtn primary" id="modalSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../utils/storage.js"></script>
+  <script src="notes.js"></script>
+</body>
+</html>

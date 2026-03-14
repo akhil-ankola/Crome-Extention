@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Page Notes</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="header-left">
+        <div class="logo-mark">📝</div>
+        <div class="header-titles">
+          <span class="app-name">Page Notes</span>
+          <span class="page-title" id="pageTitle">Loading...</span>
+        </div>
+      </div>
+      <div class="header-badge" id="headerBadge" style="display:none">
+        <span id="badgeCount">0</span>
+      </div>
+    </header>
+
+    <!-- Note Area -->
+    <div class="note-area">
+      <div class="note-label">
+        <span>Page Note</span>
+        <span class="word-count" id="wordCount">0 words</span>
+      </div>
+      <textarea
+        id="noteTextarea"
+        placeholder="Write a note for this page…&#10;&#10;Your notes are private and stored locally."
+        spellcheck="true"
+      ></textarea>
+    </div>
+
+    <!-- Highlights Summary -->
+    <div class="highlights-summary" id="highlightsSummary" style="display:none">
+      <div class="summary-header">
+        <span class="summary-icon">✦</span>
+        <span>Highlights</span>
+        <span class="hl-count" id="hlCount">0</span>
+      </div>
+      <div class="hl-preview" id="hlPreview"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-buttons">
+      <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn">Save Note</button>
+    </div>
+
+    <div class="delete-row" id="deleteRow" style="display:none">
+      <button class="btn btn-danger-ghost" id="deleteBtn">🗑 Delete note</button>
+    </div>
+
+    <!-- Footer Links -->
+    <footer class="popup-footer">
+      <button class="footer-link" id="viewAllBtn">View All Notes</button>
+      <span class="footer-sep">·</span>
+      <button class="footer-link" id="openSidebarBtn">Open Sidebar</button>
+      <span class="footer-sep">·</span>
+      <button class="footer-link" id="settingsBtn">Settings</button>
+    </footer>
+  </div>
+
+  <script src="../utils/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

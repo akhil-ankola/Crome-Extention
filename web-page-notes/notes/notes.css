@@ -413,7 +413,327 @@ body {
 .mbtn.secondary { background: var(--surface2); color: var(--text-secondary); }
 .mbtn.secondary:hover { background: var(--border); }
 
-/* Dark mode */
+/* ── Backup / Restore Section ── */
+.backup-section {
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  padding-top: 32px;
+}
+
+.backup-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.backup-section-accent {
+  width: 4px;
+  height: 44px;
+  background: var(--accent);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.backup-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.backup-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Panels */
+.backup-panels {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.backup-panel {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backup-panel-divider {
+  background: var(--border);
+  width: 1px;
+}
+
+.backup-panel-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.backup-panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.backup-panel-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.backup-panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* URL select */
+.url-select-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.url-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.url-select:focus { border-color: var(--accent); }
+
+/* Backup stats */
+.backup-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.bstat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: 1;
+}
+
+.bstat span:first-child {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.bstat span:last-child {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bstat-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+/* Buttons */
+.backup-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-btn {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.backup-btn.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.backup-btn.primary:hover {
+  background: #5248d4;
+  border-color: #5248d4;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(108,99,255,0.25);
+}
+
+.backup-btn.secondary {
+  background: var(--surface2);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.backup-btn.secondary:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.bbtn-icon { font-size: 14px; }
+
+.backup-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.backup-hint code {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10.5px;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+/* Status message */
+.backup-status {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeIn 0.2s ease;
+}
+
+.backup-status.success {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.backup-status.error {
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #fed7d7;
+}
+
+.backup-status.info {
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid #c4b5fd;
+}
+
+/* Import merge dialog */
+.merge-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.merge-dialog {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  animation: slideUp 0.2s ease;
+}
+
+.merge-dialog-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 18px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.merge-dialog-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.merge-dialog-stats {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.merge-dialog-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.merge-btn {
+  flex: 1;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.merge-btn.merge { background: var(--accent); color: white; }
+.merge-btn.merge:hover { background: #5248d4; }
+.merge-btn.replace { background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; }
+.merge-btn.replace:hover { background: #fed7d7; }
+.merge-btn.cancel-m { background: var(--surface2); color: var(--text-secondary); }
+.merge-btn.cancel-m:hover { background: var(--border); }
+
+/* ── Dark mode additions ── */
+body.dark .backup-panels { background: var(--surface); }
+body.dark .url-select { background: var(--surface2); }
+body.dark .merge-dialog { background: var(--surface); }
+body.dark .backup-status.success { background: #052e16; color: #86efac; border-color: #166534; }
+body.dark .backup-status.error { background: #2d0a0a; color: #fca5a5; border-color: #7f1d1d; }
+
+/* ── Dark mode */
 body.dark {
   --bg: #111010;
   --surface: #1a1918;

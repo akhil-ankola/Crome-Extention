@@ -68,6 +68,84 @@
           <div class="empty-sub">Select text on any page and click the highlight button.</div>
         </div>
       </div>
+
+      <!-- ── Backup & Restore Section ── -->
+      <div class="backup-section">
+        <div class="backup-section-header">
+          <div class="backup-section-accent"></div>
+          <div>
+            <h2 class="backup-title">Data Backup / Restore</h2>
+            <p class="backup-desc">Export your notes to share with others, or create a full backup to restore later.</p>
+          </div>
+        </div>
+
+        <!-- Two panels side by side -->
+        <div class="backup-panels">
+
+          <!-- Panel 1: Share / Per-page -->
+          <div class="backup-panel">
+            <div class="backup-panel-icon">🔗</div>
+            <div class="backup-panel-info">
+              <div class="backup-panel-title">Share Page Notes</div>
+              <div class="backup-panel-sub">Export notes & highlights for a specific page. Share the file — others can import it and see the same highlights.</div>
+            </div>
+            <div class="backup-panel-actions">
+              <div class="url-select-wrap">
+                <label class="url-select-label">Select page to export</label>
+                <select id="pageExportSelect" class="url-select">
+                  <option value="">— choose a page —</option>
+                </select>
+              </div>
+              <div class="backup-btn-row">
+                <button class="backup-btn primary" id="exportPageBtn">
+                  <span class="bbtn-icon">📤</span> Export Page Notes
+                </button>
+                <button class="backup-btn secondary" id="importPageBtn">
+                  <span class="bbtn-icon">📥</span> Import from File
+                </button>
+                <input type="file" id="importPageFile" accept=".json" style="display:none" />
+              </div>
+              <div class="backup-hint">Exports as <code>page-notes.json</code> · Supports shared <code>.json</code> files</div>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="backup-panel-divider"></div>
+
+          <!-- Panel 2: Full backup -->
+          <div class="backup-panel">
+            <div class="backup-panel-icon">💾</div>
+            <div class="backup-panel-info">
+              <div class="backup-panel-title">Full Backup &amp; Restore</div>
+              <div class="backup-panel-sub">Export everything — all notes and highlights across all pages. Restore on a new device or browser.</div>
+            </div>
+            <div class="backup-panel-actions">
+              <div class="backup-stats-row" id="backupStatsRow">
+                <div class="bstat"><span id="bstatNotes">0</span><span>notes</span></div>
+                <div class="bstat-sep"></div>
+                <div class="bstat"><span id="bstatHl">0</span><span>highlights</span></div>
+                <div class="bstat-sep"></div>
+                <div class="bstat"><span id="bstatPages">0</span><span>pages</span></div>
+              </div>
+              <div class="backup-btn-row">
+                <button class="backup-btn primary" id="exportAllBtn">
+                  <span class="bbtn-icon">⬆</span> Export All Notes
+                </button>
+                <button class="backup-btn secondary" id="importAllBtn">
+                  <span class="bbtn-icon">⬇</span> Import Backup
+                </button>
+                <input type="file" id="importAllFile" accept=".json" style="display:none" />
+              </div>
+              <div class="backup-hint">Exports as <code>all-page-notes-backup.json</code> · Merge or replace existing data</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Status message -->
+        <div class="backup-status" id="backupStatus" style="display:none"></div>
+      </div>
+
     </main>
   </div>
 

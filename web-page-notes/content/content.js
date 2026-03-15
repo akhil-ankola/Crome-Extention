@@ -10,71 +10,114 @@
   let selectedColor = 'yellow';
   const COLORS = ['yellow', 'green', 'blue', 'pink', 'orange'];
 
+  // ── Extension context guard ────────────────────────────────
+  // When the extension is reloaded/updated while the page stays open,
+  // chrome.runtime.id becomes undefined and any chrome API call throws
+  // "Extension context invalidated." We guard every chrome API call so
+  // failures are swallowed silently rather than spamming the console,
+  // and a periodic watcher notifies the user to refresh the tab.
+
+  function isContextValid() {
+    try {
+      // Accessing chrome.runtime.id throws if the context is gone.
+      return !!(chrome && chrome.runtime && chrome.runtime.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Wraps every chrome.storage / chrome.runtime call.
+  // Returns the fallback value silently if the context is dead.
+  function safeStorageGet(keys, fallback) {
+    return new Promise(resolve => {
+      if (!isContextValid()) return resolve(fallback);
+      try {
+        chrome.storage.local.get(keys, data => {
+          // chrome.runtime.lastError itself throws if the context dies
+          // between the .get() call and this callback firing.
+          try { if (chrome.runtime.lastError) return resolve(fallback); }
+          catch (_) { return resolve(fallback); }
+          resolve(data);
+        });
+      } catch (_) {
+        resolve(fallback);
+      }
+    });
+  }
+
+  function safeStorageSet(items) {
+    return new Promise(resolve => {
+      if (!isContextValid()) return resolve();
+      try {
+        chrome.storage.local.set(items, () => {
+          // Same race: context may die while the async write is in-flight.
+          try { void chrome.runtime.lastError; } catch (_) { /* gone */ }
+          resolve();
+        });
+      } catch (_) {
+        resolve();
+      }
+    });
+  }
+
+  function safeSendMessage(msg) {
+    if (!isContextValid()) return;
+    try {
+      chrome.runtime.sendMessage(msg);
+    } catch (_) { /* context gone — ignore */ }
+  }
+
   // ── Storage helpers ────────────────────────────────────────
   async function getNote() {
-    return new Promise(resolve =>
-      chrome.storage.local.get('notes', d => resolve((d.notes || {})[PAGE_URL] || null))
-    );
+    const d = await safeStorageGet('notes', {});
+    return ((d.notes || {})[PAGE_URL]) || null;
   }
 
   async function saveNote(text) {
-    return new Promise(resolve =>
-      chrome.storage.local.get('notes', d => {
-        const notes = d.notes || {};
-        const now = new Date().toISOString();
-        const existing = notes[PAGE_URL];
-        notes[PAGE_URL] = { title: document.title, note: text, createdAt: existing?.createdAt || now, updatedAt: now };
-        chrome.storage.local.set({ notes }, resolve);
-      })
-    );
+    const d    = await safeStorageGet('notes', {});
+    const notes = d.notes || {};
+    const now   = new Date().toISOString();
+    const existing = notes[PAGE_URL];
+    notes[PAGE_URL] = { title: document.title, note: text, createdAt: existing?.createdAt || now, updatedAt: now };
+    await safeStorageSet({ notes });
   }
 
   async function deleteNote() {
-    return new Promise(resolve =>
-      chrome.storage.local.get('notes', d => {
-        const notes = d.notes || {};
-        delete notes[PAGE_URL];
-        chrome.storage.local.set({ notes }, resolve);
-      })
-    );
+    const d     = await safeStorageGet('notes', {});
+    const notes = d.notes || {};
+    delete notes[PAGE_URL];
+    await safeStorageSet({ notes });
   }
 
   async function getHighlights() {
-    return new Promise(resolve =>
-      chrome.storage.local.get('highlights', d => resolve(((d.highlights || {})[PAGE_URL]) || []))
-    );
+    const d = await safeStorageGet('highlights', {});
+    return ((d.highlights || {})[PAGE_URL]) || [];
   }
 
   async function saveHighlight(highlight) {
-    return new Promise(resolve =>
-      chrome.storage.local.get('highlights', d => {
-        const all = d.highlights || {};
-        if (!all[PAGE_URL]) all[PAGE_URL] = [];
-        highlight.id = highlight.id || Date.now().toString();
-        highlight.createdAt = highlight.createdAt || new Date().toISOString();
-        all[PAGE_URL].push(highlight);
-        chrome.storage.local.set({ highlights: all }, () => resolve(highlight.id));
-      })
-    );
+    const d   = await safeStorageGet('highlights', {});
+    const all = d.highlights || {};
+    if (!all[PAGE_URL]) all[PAGE_URL] = [];
+    highlight.id        = highlight.id        || Date.now().toString();
+    highlight.createdAt = highlight.createdAt || new Date().toISOString();
+    all[PAGE_URL].push(highlight);
+    await safeStorageSet({ highlights: all });
+    return highlight.id;
   }
 
   async function deleteHighlight(id) {
-    return new Promise(resolve =>
-      chrome.storage.local.get('highlights', d => {
-        const all = d.highlights || {};
-        if (all[PAGE_URL]) {
-          all[PAGE_URL] = all[PAGE_URL].filter(h => h.id !== id);
-          if (!all[PAGE_URL].length) delete all[PAGE_URL];
-        }
-        chrome.storage.local.set({ highlights: all }, resolve);
-      })
-    );
+    const d   = await safeStorageGet('highlights', {});
+    const all = d.highlights || {};
+    if (all[PAGE_URL]) {
+      all[PAGE_URL] = all[PAGE_URL].filter(h => h.id !== id);
+      if (!all[PAGE_URL].length) delete all[PAGE_URL];
+    }
+    await safeStorageSet({ highlights: all });
   }
 
   async function getSettings() {
-    return new Promise(resolve =>
-      chrome.storage.local.get('settings', d => resolve(d.settings || { theme: 'light' }))
-    );
+    const d = await safeStorageGet('settings', {});
+    return d.settings || { theme: 'light' };
   }
 
   function sanitize(str) {
@@ -532,7 +575,7 @@
     await saveHighlight(highlight);
     updateFloatBtnBadge();
     showWpnToast('Highlight saved!');
-    chrome.runtime.sendMessage({ action: 'refreshBadge' });
+    safeSendMessage({ action: 'refreshBadge' });
 
     if (sidebarOpen) renderSidebarHighlights();
   }
@@ -628,8 +671,8 @@
 
   function bindSidebarEvents() {
     document.getElementById('wpn-sidebar-close').addEventListener('click', closeSidebar);
-    document.getElementById('wpn-view-all').addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openNotesPage' }));
-    document.getElementById('wpn-open-settings').addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }));
+    document.getElementById('wpn-view-all').addEventListener('click', () => safeSendMessage({ action: 'openNotesPage' }));
+    document.getElementById('wpn-open-settings').addEventListener('click', () => safeSendMessage({ action: 'openOptions' }));
   }
 
   function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }
@@ -664,7 +707,7 @@
       if (!text) { showWpnToast('Write something first!'); return; }
       await saveNote(text);
       newDelete.style.display = 'block';
-      chrome.runtime.sendMessage({ action: 'refreshBadge' });
+      safeSendMessage({ action: 'refreshBadge' });
       updateFloatBtnBadge();
       showWpnToast('Note saved ✓');
     });
@@ -674,7 +717,7 @@
       await deleteNote();
       textarea.value = '';
       newDelete.style.display = 'none';
-      chrome.runtime.sendMessage({ action: 'refreshBadge' });
+      safeSendMessage({ action: 'refreshBadge' });
       updateFloatBtnBadge();
       showWpnToast('Note deleted');
     });
@@ -718,7 +761,7 @@
           while (span.firstChild) parent.insertBefore(span.firstChild, span);
           span.remove();
         });
-        chrome.runtime.sendMessage({ action: 'refreshBadge' });
+        safeSendMessage({ action: 'refreshBadge' });
         updateFloatBtnBadge();
         renderSidebarHighlights();
         showWpnToast('Highlight deleted');
@@ -767,16 +810,33 @@
   }
 
   // ── Message Listener ───────────────────────────────────────
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.action === 'toggleSidebar') toggleSidebar();
-    if (msg.action === 'saveHighlightFromContext') {
-      pendingHighlightRange = null;
-      showHighlightDialog(msg.text, true);
+  // Guard the listener — if context is already dead on injection, don't throw.
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!isContextValid()) return;
+      if (msg.action === 'toggleSidebar') toggleSidebar();
+      if (msg.action === 'saveHighlightFromContext') {
+        pendingHighlightRange = null;
+        showHighlightDialog(msg.text, true);
+      }
+    });
+  } catch (_) { /* extension already invalidated at registration time */ }
+
+  // ── Context invalidation watcher ──────────────────────────
+  // Once the extension is reloaded/updated mid-session, the context
+  // becomes invalid. We detect this and show a toast asking the user
+  // to refresh — instead of silently throwing on every chrome API call.
+  const _contextWatcher = setInterval(() => {
+    if (!isContextValid()) {
+      clearInterval(_contextWatcher);
+      showWpnToast('Extension updated — please refresh the page.');
     }
-  });
+  }, 3000);
 
   // ── Init ────────────────────────────────────────────────────
-  if (document.readyState === 'loading') {
+  if (!isContextValid()) {
+    console.warn('[WPN] Extension context already invalid at injection — aborting init.');
+  } else if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();

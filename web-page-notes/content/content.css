@@ -167,8 +167,10 @@ mark.wpn-highlight,
 }
 
 .wpn-color-btn {
+  aspect-ratio: 1 / 1;
+  height: auto;
   width: 24px;
-  height: 24px;
+  /* height: 24px; */
   border-radius: 50%;
   border: 2.5px solid transparent;
   cursor: pointer;
@@ -499,9 +501,10 @@ mark.wpn-highlight,
   cursor: pointer;
   font-family: 'Inter', sans-serif;
   font-weight: 500;
+  border: 1px solid #6c63ff;
 }
 
-.wpn-footer-link:hover { text-decoration: underline; }
+.wpn-footer-link:hover, .wpn-footer-link:focus { background-color: #6c63ff; outline: none; }
 
 /* Dark mode sidebar */
 body.wpn-dark #wpn-sidebar,

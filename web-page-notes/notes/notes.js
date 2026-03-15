@@ -66,7 +66,7 @@
     Object.assign(t.style, {
       position: 'fixed', bottom: '24px', right: '24px',
       background: '#1a1918', color: 'white', padding: '10px 20px',
-      borderRadius: '20px', fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+      borderRadius: '20px', fontSize: '13px', fontFamily: 'Inter, sans-serif',
       opacity: '0', transition: 'opacity 0.2s ease', zIndex: '9999', pointerEvents: 'none'
     });
     t.textContent = msg;

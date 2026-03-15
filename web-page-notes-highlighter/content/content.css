@@ -342,6 +342,7 @@ mark.wpn-highlight,
 }
 
 .wpn-sidebar-close:hover { background: #e4e1da; color: #1a1814; }
+.wpn-sidebar-close:focus{ outline: none; }
 
 .wpn-sidebar-body {
   flex: 1;

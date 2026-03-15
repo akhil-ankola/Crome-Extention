@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Web Page Notes",
+  "name": "Web Page Notes & Highlighter",
   "version": "1.0.0",
   "description": "Take notes and highlight text on any webpage. Attach notes to highlights and revisit them anytime.",
   "icons": {

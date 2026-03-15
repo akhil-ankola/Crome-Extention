@@ -1,5 +1,5 @@
 /* notes/notes.css */
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
   --bg: #f9f8f6;
@@ -19,7 +19,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text-primary);
   min-height: 100vh;
@@ -54,7 +54,7 @@ body {
 .logo-icon { font-size: 22px; }
 
 .logo-text {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 20px;
   color: var(--text-primary);
 }
@@ -83,7 +83,7 @@ body {
   border: none;
   background: transparent;
   outline: none;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   color: var(--text-primary);
   width: 200px;
@@ -97,7 +97,7 @@ body {
   color: var(--text-secondary);
   padding: 8px 14px;
   border-radius: 8px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
@@ -131,7 +131,7 @@ body {
 }
 
 .stat-num {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 26px;
   color: var(--accent);
   line-height: 1;
@@ -162,7 +162,7 @@ body {
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -225,10 +225,8 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: pre-wrap;   /* preserve paragraph line-breaks */
+  word-break: break-word;
 }
 
 .note-card-meta {
@@ -249,7 +247,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -278,10 +276,8 @@ body {
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: pre-wrap;   /* preserve line-breaks from multi-paragraph selections */
+  word-break: break-word;
 }
 
 .hl-card-note {
@@ -353,7 +349,7 @@ body {
 }
 
 .modal-title {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 20px;
   color: var(--text-primary);
 }
@@ -385,7 +381,7 @@ body {
   border: 1.5px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
   color: var(--text-primary);
   resize: vertical;
@@ -401,7 +397,7 @@ body {
   padding: 9px 20px;
   border: none;
   border-radius: 8px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -437,7 +433,7 @@ body {
 }
 
 .backup-title {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 20px;
   color: var(--text-primary);
   margin-bottom: 4px;
@@ -514,7 +510,7 @@ body {
   border-radius: 7px;
   background: var(--bg);
   color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12.5px;
   outline: none;
   cursor: pointer;
@@ -542,7 +538,7 @@ body {
 }
 
 .bstat span:first-child {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 20px;
   color: var(--accent);
   line-height: 1;
@@ -578,7 +574,7 @@ body {
   padding: 9px 14px;
   border-radius: 8px;
   border: 1.5px solid transparent;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -679,7 +675,7 @@ body {
 }
 
 .merge-dialog-title {
-  font-family: 'Instrument Serif', serif;
+  font-family: 'Inter', sans-serif;
   font-size: 18px;
   color: var(--text-primary);
   margin-bottom: 6px;
@@ -712,7 +708,7 @@ body {
   padding: 9px 14px;
   border: none;
   border-radius: 8px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;

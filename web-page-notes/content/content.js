@@ -92,7 +92,6 @@
   async function init() {
     const settings = await getSettings();
     if (settings.theme === 'dark') document.body.classList.add('wpn-dark');
-
     await restoreHighlights();
     injectFloatButton();
     injectSidebar();
@@ -107,29 +106,156 @@
     highlights.forEach(h => applyHighlightToDOM(h));
   }
 
-  // ── DOM highlight application ─────────────────────────────
-  // Handles both single-node and multi-node (multi-paragraph) selections.
-  // Strategy:
-  //   1. Collect all visible text nodes in document order.
-  //   2. Concatenate their values with a map of node→offset so we can
-  //      convert a character position in the flat string back to a
-  //      (node, offset) pair.
-  //   3. Search the flat string for the target text (normalising
-  //      whitespace so paragraph breaks / extra spaces don't block matching).
-  //   4. Build a Range from start→end across however many nodes it spans.
-  //   5. Wrap each node fragment individually with a highlight <span>.
+  // ══════════════════════════════════════════════════════════════════
+  //  CORE HIGHLIGHTING ENGINE
+  //
+  //  Two paths:
+  //
+  //  1. LIVE PATH  — user just selected text; we have a live Range.
+  //     highlightLiveRange(range, id, color, note)
+  //     Exact, instant, handles every selection type without any
+  //     text searching. This is the primary path.
+  //
+  //  2. RESTORE PATH — page reload; we only have the saved text string.
+  //     applyHighlightToDOM(highlight)
+  //     Re-searches the page text, builds a Range, then calls
+  //     highlightLiveRange() so both paths share the same safe kernel.
+  //
+  //  Both paths ultimately call wrapTextNode() which ONLY ever wraps
+  //  a single text node — never a block element — keeping DOM valid.
+  // ══════════════════════════════════════════════════════════════════
 
-  function getTextNodes() {
+  /**
+   * highlightLiveRange
+   * ------------------
+   * Given a live Range (from window.getSelection()), wrap all selected
+   * text fragments in highlight <mark> elements.
+   *
+   * Works for:
+   *  - Single word / single line selections
+   *  - Entire-element selections (e.g. triple-click on a <p>)
+   *  - Multi-paragraph / multi-element selections
+   *  - Selections inside nested inline elements (<b>, <i>, <a>, etc.)
+   */
+  function highlightLiveRange(range, id, color, note) {
+    if (!range || range.collapsed) return false;
+
+    const textNodes = getTextNodesInRange(range);
+    if (textNodes.length === 0) return false;
+
+    try {
+      textNodes.forEach((node, i) => {
+        // Default: wrap the entire node text
+        let start = 0;
+        let end   = node.nodeValue.length;
+
+        // First node: begin at the range's start offset
+        if (i === 0 && node === range.startContainer) {
+          start = range.startOffset;
+        }
+        // Last node: stop at the range's end offset
+        if (i === textNodes.length - 1 && node === range.endContainer) {
+          end = range.endOffset;
+        }
+
+        // Skip pure-whitespace fragments (e.g. newlines between block elements)
+        if (end > start && node.nodeValue.slice(start, end).trim().length > 0) {
+          wrapTextNode(node, start, end, id, color, note);
+        }
+      });
+      return true;
+    } catch (err) {
+      console.warn('[WPN] highlightLiveRange error:', err);
+      return false;
+    }
+  }
+
+  /**
+   * getTextNodesInRange
+   * -------------------
+   * Returns, in document order, every text node that overlaps the range.
+   * Skips our own UI elements and script/style nodes.
+   */
+  function getTextNodesInRange(range) {
+    const root = range.commonAncestorContainer;
+
+    // Fast path: selection entirely within one text node
+    if (root.nodeType === Node.TEXT_NODE) {
+      return isOwnUINode(root) ? [] : [root];
+    }
+
+    const nodes  = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (isOwnUINode(node))           return NodeFilter.FILTER_REJECT;
+        if (!range.intersectsNode(node)) return NodeFilter.FILTER_SKIP;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    return nodes;
+  }
+
+  /**
+   * wrapTextNode
+   * ------------
+   * Wraps the character slice [start, end) of a SINGLE text node with
+   * a <mark class="wpn-highlight">. Uses splitText() to carve out
+   * exactly the selected substring — never touches block parents.
+   *
+   * Before: [TEXT: "Hello world foo"]
+   * After:  [TEXT: "Hello "] [MARK: "world"] [TEXT: " foo"]
+   */
+  function wrapTextNode(textNode, start, end, id, color, note) {
+    if (start >= end) return null;
+    start = Math.max(0, start);
+    end   = Math.min(textNode.nodeValue.length, end);
+    if (start >= end) return null;
+
+    // Carve the tail FIRST so `start` offset stays valid in the remaining node
+    if (end < textNode.nodeValue.length) textNode.splitText(end);
+    if (start > 0)                       textNode = textNode.splitText(start);
+
+    const mark = document.createElement('mark');
+    mark.className    = 'wpn-highlight';
+    mark.dataset.id    = id;
+    mark.dataset.color = color || 'yellow';
+    mark.dataset.note  = note  || '';
+
+    textNode.parentNode.insertBefore(mark, textNode);
+    mark.appendChild(textNode);
+    return mark;
+  }
+
+  // ── isOwnUINode ───────────────────────────────────────────
+  function isOwnUINode(node) {
+    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (!el) return false;
+    if (el.closest('#wpn-sidebar'))           return true;
+    if (el.closest('#wpn-float-btn'))         return true;
+    if (el.closest('.wpn-selection-bubble'))  return true;
+    if (el.closest('.wpn-highlight-dialog'))  return true;
+    if (el.closest('.wpn-dialog-overlay'))    return true;
+    const tag = el.tagName;
+    if (tag && ['SCRIPT','STYLE','NOSCRIPT','IFRAME','TEXTAREA','INPUT'].includes(tag)) return true;
+    return false;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  RESTORE PATH
+  //  Re-locate saved text on the page and re-apply highlighting.
+  // ══════════════════════════════════════════════════════════════════
+
+  function getAllContentTextNodes() {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-      acceptNode: node => {
-        const p = node.parentElement;
-        if (!p) return NodeFilter.FILTER_REJECT;
-        if (p.classList && p.classList.contains('wpn-highlight')) return NodeFilter.FILTER_REJECT;
-        if (['SCRIPT','STYLE','NOSCRIPT','IFRAME','TEXTAREA','INPUT'].includes(p.tagName))
+      acceptNode(node) {
+        if (isOwnUINode(node)) return NodeFilter.FILTER_REJECT;
+        // Don't rewrap already-highlighted nodes
+        if (node.parentElement && node.parentElement.classList.contains('wpn-highlight')) {
           return NodeFilter.FILTER_REJECT;
-        if (p.closest('#wpn-sidebar') || p.closest('#wpn-float-btn') ||
-            p.closest('.wpn-highlight-dialog') || p.closest('.wpn-selection-bubble'))
-          return NodeFilter.FILTER_REJECT;
+        }
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -139,133 +265,72 @@
     return nodes;
   }
 
-  // Normalise whitespace for matching: collapse runs of whitespace / newlines
-  // to a single space so "foo\n\nbar" matches stored text "foo  bar" etc.
-  function normaliseWS(str) {
-    return str.replace(/\s+/g, ' ');
-  }
+  function normaliseWS(str) { return str.replace(/\s+/g, ' '); }
 
   function applyHighlightToDOM(h) {
     if (!h.text || !h.text.trim()) return;
 
-    const nodes   = getTextNodes();
+    const nodes = getAllContentTextNodes();
     if (nodes.length === 0) return;
 
-    // Build flat text + a lookup table: for each char position in flatText,
-    // which node does it belong to, and at what local offset?
+    // Build a flat text string + position map
     let flatText = '';
-    const map = [];   // map[charIdx] = { node, localOffset }
+    const map    = [];   // map[i] = {node, offset} | null (synthetic separator)
+
     for (const node of nodes) {
       const val = node.nodeValue;
       for (let i = 0; i < val.length; i++) {
         map.push({ node, offset: i });
         flatText += val[i];
       }
-      // Add a space between nodes so cross-paragraph text can match
-      // (the space is virtual — it is not added to any node)
+      // Virtual separator represents whitespace between nodes (paragraph breaks)
       flatText += ' ';
-      map.push(null);   // sentinel for the synthetic space
+      map.push(null);
     }
 
-    // Search normalised flat text for normalised target
     const needle   = normaliseWS(h.text.trim());
     const haystack = normaliseWS(flatText);
     const idx      = haystack.indexOf(needle);
-    if (idx === -1) return;   // text not found on this page
+    if (idx === -1) return;
 
-    const endIdx = idx + needle.length;
+    const endIdx = idx + needle.length; // exclusive
 
-    // Walk back to the first real (non-sentinel) position at or after idx
-    let startEntry = map[idx];
+    // Resolve start: first real entry at or after idx
     let si = idx;
-    while (!startEntry && si < map.length) startEntry = map[++si];
-    if (!startEntry) return;
+    while (si < map.length && map[si] === null) si++;
+    if (si >= map.length) return;
+    const startEntry = map[si];
 
-    // Walk back to the last real position at or before endIdx-1
-    let endEntry = map[endIdx - 1];
+    // Resolve end: last real entry before endIdx
     let ei = endIdx - 1;
-    while (!endEntry && ei >= 0) endEntry = map[--ei];
-    if (!endEntry) return;
+    while (ei >= 0 && map[ei] === null) ei--;
+    if (ei < 0) return;
+    const endEntry = map[ei];
 
-    // Single-node case: use surroundContents for simplicity
-    if (startEntry.node === endEntry.node) {
-      try {
-        const range = document.createRange();
-        range.setStart(startEntry.node, startEntry.offset);
-        range.setEnd(endEntry.node, endEntry.offset + 1);
-        wrapRange(range, h.id, h.color, h.note);
-      } catch (_) { /* node may have changed */ }
-      return;
-    }
-
-    // Multi-node case: collect all nodes involved, wrap each fragment
-    // individually so we never call surroundContents across element boundaries.
-    const involvedNodes = [];
-    let collecting = false;
-    for (const node of nodes) {
-      if (node === startEntry.node) collecting = true;
-      if (collecting) involvedNodes.push(node);
-      if (node === endEntry.node) break;
-    }
-
-    involvedNodes.forEach((node, i) => {
-      try {
-        const range = document.createRange();
-        if (i === 0) {
-          // First node: from startEntry.offset to end of node
-          range.setStart(node, startEntry.offset);
-          range.setEnd(node, node.nodeValue.length);
-        } else if (i === involvedNodes.length - 1) {
-          // Last node: from 0 to endEntry.offset + 1
-          range.setStart(node, 0);
-          range.setEnd(endEntry.node, endEntry.offset + 1);
-        } else {
-          // Middle nodes: wrap entirely
-          range.selectNodeContents(node);
-        }
-        // Only wrap if the range contains actual non-whitespace text
-        if (range.toString().trim().length > 0) {
-          wrapRange(range, h.id, h.color, h.note);
-        }
-      } catch (_) { /* skip nodes that have changed */ }
-    });
-  }
-
-  // Wraps a range that is guaranteed to be within a single text node.
-  // Uses surroundContents — the only DOM method that works cleanly for
-  // inline wrapping without restructuring block elements.
-  // Never call this on a range that crosses element boundaries.
-  function wrapRange(range, id, color, note) {
-    const mark = document.createElement('mark');
-    mark.className = 'wpn-highlight';
-    mark.dataset.id = id;
-    mark.dataset.color = color || 'yellow';
-    mark.dataset.note = note || '';
     try {
-      range.surroundContents(mark);
-    } catch (_) {
-      // Should not happen since callers guarantee a single-text-node range,
-      // but if it does, do nothing — never mutate the DOM in an unknown state.
-      return null;
+      const range = document.createRange();
+      range.setStart(startEntry.node, startEntry.offset);
+      range.setEnd(endEntry.node,     endEntry.offset + 1);
+      highlightLiveRange(range, h.id, h.color, h.note);
+    } catch (err) {
+      console.warn('[WPN] applyHighlightToDOM range error:', err);
     }
-    return mark;
   }
 
-  // ── Selection Listener + Float Button Visibility ─────────────
-  function setupSelectionListener() {
+  // ══════════════════════════════════════════════════════════════════
+  //  SELECTION LISTENER + FLOAT BUTTON
+  // ══════════════════════════════════════════════════════════════════
 
-    // ── mouseup: primary trigger for mouse-drag selection ────
+  function setupSelectionListener() {
     document.addEventListener('mouseup', e => {
-      // Ignore clicks inside our own UI
       if (e.target.closest('#wpn-sidebar') ||
           e.target.closest('#wpn-float-btn') ||
           e.target.closest('.wpn-selection-bubble') ||
           e.target.closest('.wpn-highlight-dialog') ||
           e.target.closest('.wpn-dialog-overlay')) return;
 
-      // Small delay so the browser finalises the selection first
       setTimeout(() => {
-        const sel = window.getSelection();
+        const sel  = window.getSelection();
         const text = sel ? sel.toString().trim() : '';
         if (text.length > 0) {
           showSelectionBubble(e.clientX, e.clientY, sel);
@@ -277,19 +342,14 @@
       }, 10);
     });
 
-    // ── keyup: keyboard selections (Shift+Arrow, Ctrl+A …) ───
     document.addEventListener('keyup', e => {
       if (e.target.closest('#wpn-sidebar')) return;
-      const sel = window.getSelection();
+      const sel  = window.getSelection();
       const text = sel ? sel.toString().trim() : '';
-      if (text.length > 0) {
-        positionAndShowFloatBtn(sel);
-      } else {
-        hideFloatBtn();
-      }
+      if (text.length > 0) positionAndShowFloatBtn(sel);
+      else                  hideFloatBtn();
     });
 
-    // ── mousedown: click anywhere outside our UI = clear ─────
     document.addEventListener('mousedown', e => {
       if (e.target.closest('.wpn-selection-bubble') ||
           e.target.closest('#wpn-float-btn')) return;
@@ -297,24 +357,18 @@
       hideFloatBtn();
     });
 
-    // ── selectionchange: catches Escape, collapses, etc. ─────
     document.addEventListener('selectionchange', () => {
-      const sel = window.getSelection();
+      const sel  = window.getSelection();
       const text = sel ? sel.toString().trim() : '';
       if (text.length === 0) {
-        // 120 ms delay: give mouseup / click handlers a chance to run first
-        // so clicking the float button itself doesn't instantly hide it
         setTimeout(() => {
           const selNow = window.getSelection();
-          if (!selNow || selNow.toString().trim().length === 0) {
-            hideFloatBtn();
-          }
+          if (!selNow || selNow.toString().trim().length === 0) hideFloatBtn();
         }, 120);
       }
     });
   }
 
-  // ── Position the float button near the selection, then show it ──
   function positionAndShowFloatBtn(sel) {
     const btn = document.getElementById('wpn-float-btn');
     if (!btn || !sel || sel.rangeCount === 0) return;
@@ -322,39 +376,25 @@
     const range = sel.getRangeAt(0);
     const rect  = range.getBoundingClientRect();
 
-    // If getBoundingClientRect returns an empty rect (e.g. inside an input),
-    // fall back to a safe corner position instead of placing at 0,0.
     if (!rect || (rect.width === 0 && rect.height === 0)) {
-      btn.style.top  = '80px';
+      btn.style.top   = '80px';
       btn.style.right = '24px';
       btn.style.left  = 'auto';
     } else {
-      const btnSize   = 44;   // matches CSS width/height
-      const gap       = 10;   // space between selection bottom and button top
-      const margin    = 8;    // minimum distance from viewport edge
-
-      // Horizontal: centre under the selection, clamped to viewport
+      const btnSize = 44;
+      const gap     = 10;
+      const margin  = 8;
       let left = rect.left + rect.width / 2 - btnSize / 2;
       left = Math.max(margin, Math.min(left, window.innerWidth - btnSize - margin));
-
-      // Vertical: below the selection; if that clips the bottom, go above
       let top = rect.bottom + gap + window.scrollY;
-      const topAbove = rect.top - btnSize - gap + window.scrollY;
       if (rect.bottom + gap + btnSize > window.innerHeight) {
-        top = topAbove;
+        top = rect.top - btnSize - gap + window.scrollY;
       }
-
-      btn.style.left = left + 'px';
-      btn.style.top  = top  + 'px';
-      btn.style.right = 'auto';  // clear any previous right value
+      btn.style.left  = left + 'px';
+      btn.style.top   = top  + 'px';
+      btn.style.right = 'auto';
     }
-
     btn.classList.add('visible');
-  }
-
-  function showFloatBtn() {
-    const btn = document.getElementById('wpn-float-btn');
-    if (btn) btn.classList.add('visible');
   }
 
   function hideFloatBtn() {
@@ -364,10 +404,16 @@
 
   function showSelectionBubble(x, y, sel) {
     removeSelectionBubble();
-    const bubble = document.createElement('div');
+
+    // Capture Range immediately — before any focus change collapses it
+    if (sel.rangeCount > 0) {
+      pendingHighlightRange = sel.getRangeAt(0).cloneRange();
+    }
+
+    const bubble  = document.createElement('div');
     bubble.className = 'wpn-selection-bubble';
 
-    const hlBtn = document.createElement('button');
+    const hlBtn   = document.createElement('button');
     hlBtn.className = 'wpn-bubble-btn highlight';
     hlBtn.innerHTML = '✦ Highlight';
 
@@ -380,37 +426,27 @@
     document.body.appendChild(bubble);
     selectionBubble = bubble;
 
-    // Position above selection
     const bRect = bubble.getBoundingClientRect();
-    let top = y - 48;
+    let top  = y - 48;
     let left = x - bRect.width / 2;
     if (top < 8) top = y + 20;
     if (left < 8) left = 8;
     if (left + bRect.width > window.innerWidth - 8) left = window.innerWidth - bRect.width - 8;
-
-    bubble.style.top = top + 'px';
+    bubble.style.top  = top  + 'px';
     bubble.style.left = left + 'px';
 
-    // Save range before it might be cleared
-    pendingHighlightRange = sel.getRangeAt(0).cloneRange();
+    const fullSelectedText = pendingHighlightRange
+      ? pendingHighlightRange.toString().trim()
+      : sel.toString().trim();
 
     hlBtn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      // Use the cloned range to extract full text — sel may be gone by now
-      const fullSelectedText = pendingHighlightRange
-        ? pendingHighlightRange.toString().trim()
-        : sel.toString().trim();
+      e.preventDefault(); e.stopPropagation();
       showHighlightDialog(fullSelectedText, false);
       removeSelectionBubble();
     });
 
     noteBtn.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const fullSelectedText = pendingHighlightRange
-        ? pendingHighlightRange.toString().trim()
-        : sel.toString().trim();
+      e.preventDefault(); e.stopPropagation();
       showHighlightDialog(fullSelectedText, true);
       removeSelectionBubble();
     });
@@ -421,15 +457,10 @@
   }
 
   // ── Highlight Dialog ───────────────────────────────────────
-  // `fullText` is always the complete selected string — never truncated.
-  // Truncation only happens in the *preview label* inside the dialog UI.
   function showHighlightDialog(fullText, focusNote) {
-    // Remove any existing dialog
     document.querySelector('.wpn-dialog-overlay')?.remove();
     document.querySelector('.wpn-highlight-dialog')?.remove();
 
-    // Preview shown in the dialog: capped at 160 chars for display only.
-    // The original fullText is kept in the JS closure and saved intact.
     const PREVIEW_LIMIT = 160;
     const previewText = fullText.length > PREVIEW_LIMIT
       ? fullText.slice(0, PREVIEW_LIMIT) + '…'
@@ -459,7 +490,6 @@
     const textarea = dialog.querySelector('.wpn-dialog-textarea');
     if (focusNote) textarea.focus();
 
-    // Color selection
     dialog.querySelectorAll('.wpn-color-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         dialog.querySelectorAll('.wpn-color-btn').forEach(b => b.classList.remove('active'));
@@ -469,52 +499,42 @@
     });
 
     const cleanup = () => { overlay.remove(); dialog.remove(); };
-
     overlay.addEventListener('click', cleanup);
     dialog.querySelector('.cancel').addEventListener('click', cleanup);
     dialog.querySelector('.save').addEventListener('click', async () => {
       const note = textarea.value.trim();
-      // Pass fullText — the complete, untruncated selection string
       await doHighlight(fullText, selectedColor, note);
       cleanup();
     });
   }
 
+  // ── doHighlight ────────────────────────────────────────────
   async function doHighlight(text, color, note) {
-    const id = Date.now().toString();
+    const id        = Date.now().toString();
     const highlight = { id, text, color, note, createdAt: new Date().toISOString() };
 
-    if (pendingHighlightRange && isSingleTextNodeRange(pendingHighlightRange)) {
-      // Range stays inside one text node — safe to wrap directly with no DOM surgery.
-      try {
-        wrapRange(pendingHighlightRange, id, color, note);
-      } catch (_) {
-        applyHighlightToDOM({ ...highlight });
-      }
-    } else {
-      // Multi-paragraph or multi-element range: applyHighlightToDOM wraps each
-      // text node fragment individually, so block elements (<p>, <div> …) are
-      // NEVER placed inside a <mark>. This is the only safe path for complex ranges.
+    let succeeded = false;
+
+    if (pendingHighlightRange) {
+      // PRIMARY: use the exact live Range from the user's selection
+      succeeded = highlightLiveRange(pendingHighlightRange, id, color, note);
+      pendingHighlightRange = null;
+    }
+
+    if (!succeeded) {
+      // FALLBACK: text-search restore path (e.g. context-menu trigger)
       applyHighlightToDOM({ ...highlight });
     }
-    pendingHighlightRange = null;
+
+    // Clear the browser selection overlay
+    window.getSelection()?.removeAllRanges();
 
     await saveHighlight(highlight);
     updateFloatBtnBadge();
     showWpnToast('Highlight saved!');
     chrome.runtime.sendMessage({ action: 'refreshBadge' });
 
-    // Refresh sidebar if open
     if (sidebarOpen) renderSidebarHighlights();
-  }
-
-  // Returns true only when a range starts and ends in the same text node.
-  // Only these ranges can be safely wrapped with a single <mark> via surroundContents.
-  function isSingleTextNodeRange(range) {
-    return (
-      range.startContainer === range.endContainer &&
-      range.startContainer.nodeType === Node.TEXT_NODE
-    );
   }
 
   // ── Tooltip ────────────────────────────────────────────────
@@ -535,7 +555,7 @@
     document.addEventListener('mousemove', e => {
       if (tooltip.classList.contains('visible')) {
         tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 240) + 'px';
-        tooltip.style.top = (e.clientY - 50) + 'px';
+        tooltip.style.top  = (e.clientY - 50) + 'px';
       }
     });
 
@@ -545,10 +565,7 @@
 
     document.addEventListener('click', e => {
       const hl = e.target.closest('.wpn-highlight');
-      if (hl) {
-        openSidebar();
-        highlightFlash(hl);
-      }
+      if (hl) { openSidebar(); highlightFlash(hl); }
     });
   }
 
@@ -565,22 +582,15 @@
     btn.title = 'Page Notes (Ctrl+Shift+N)';
     btn.textContent = '📝';
     document.body.appendChild(btn);
-    btn.addEventListener('click', () => {
-      toggleSidebar();
-      hideFloatBtn();
-    });
+    btn.addEventListener('click', () => { toggleSidebar(); hideFloatBtn(); });
   }
 
   async function updateFloatBtnBadge() {
     const btn = document.getElementById('wpn-float-btn');
     if (!btn) return;
-    const note = await getNote();
+    const note       = await getNote();
     const highlights = await getHighlights();
-    if (note || highlights.length > 0) {
-      btn.classList.add('has-notes');
-    } else {
-      btn.classList.remove('has-notes');
-    }
+    btn.classList.toggle('has-notes', !!(note || highlights.length > 0));
   }
 
   // ── Sidebar Injection ──────────────────────────────────────
@@ -618,18 +628,13 @@
 
   function bindSidebarEvents() {
     document.getElementById('wpn-sidebar-close').addEventListener('click', closeSidebar);
-    document.getElementById('wpn-view-all').addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'openNotesPage' });
-    });
-    document.getElementById('wpn-open-settings').addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'openOptions' });
-    });
+    document.getElementById('wpn-view-all').addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openNotesPage' }));
+    document.getElementById('wpn-open-settings').addEventListener('click', () => chrome.runtime.sendMessage({ action: 'openOptions' }));
   }
 
-  // ── Sidebar Open / Close ────────────────────────────────────
   function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }
-  function openSidebar() { sidebarOpen = true; document.getElementById('wpn-sidebar').classList.add('open'); loadSidebarData(); }
-  function closeSidebar() { sidebarOpen = false; document.getElementById('wpn-sidebar').classList.remove('open'); }
+  function openSidebar()   { sidebarOpen = true;  document.getElementById('wpn-sidebar').classList.add('open');    loadSidebarData(); }
+  function closeSidebar()  { sidebarOpen = false; document.getElementById('wpn-sidebar').classList.remove('open'); }
 
   async function loadSidebarData() {
     await loadSidebarNote();
@@ -637,26 +642,19 @@
   }
 
   async function loadSidebarNote() {
-    const note = await getNote();
-    const textarea = document.getElementById('wpn-sidebar-textarea');
+    const note      = await getNote();
+    const textarea  = document.getElementById('wpn-sidebar-textarea');
     const deleteBtn = document.getElementById('wpn-delete-note');
-    const saveBtn = document.getElementById('wpn-save-note');
+    const saveBtn   = document.getElementById('wpn-save-note');
     const cancelBtn = document.getElementById('wpn-cancel-note');
 
     textarea.value = note ? note.note : '';
+    deleteBtn.style.display = note ? 'block' : 'none';
 
-    if (note) {
-      deleteBtn.style.display = 'block';
-    } else {
-      deleteBtn.style.display = 'none';
-    }
-
-    // Remove old listeners by replacing elements
-    const newSave = saveBtn.cloneNode(true);
+    const newSave   = saveBtn.cloneNode(true);
     const newCancel = cancelBtn.cloneNode(true);
     const newDelete = deleteBtn.cloneNode(true);
     newDelete.style.display = note ? 'block' : 'none';
-
     saveBtn.replaceWith(newSave);
     cancelBtn.replaceWith(newCancel);
     deleteBtn.replaceWith(newDelete);
@@ -670,11 +668,7 @@
       updateFloatBtnBadge();
       showWpnToast('Note saved ✓');
     });
-
-    newCancel.addEventListener('click', () => {
-      textarea.value = note ? note.note : '';
-    });
-
+    newCancel.addEventListener('click', () => { textarea.value = note ? note.note : ''; });
     newDelete.addEventListener('click', async () => {
       if (!confirm('Delete page note?')) return;
       await deleteNote();
@@ -688,12 +682,12 @@
 
   async function renderSidebarHighlights() {
     const highlights = await getHighlights();
-    const list = document.getElementById('wpn-hl-list');
+    const list  = document.getElementById('wpn-hl-list');
     const badge = document.getElementById('wpn-hl-badge');
     if (!list) return;
 
     badge.textContent = highlights.length;
-    list.innerHTML = '';
+    list.innerHTML    = '';
 
     if (highlights.length === 0) {
       list.innerHTML = `<div class="wpn-empty-state">No highlights yet.<br>Select text on the page and click ✦ Highlight.</div>`;
@@ -715,26 +709,21 @@
         </div>
       `;
 
-      // Scroll to
       card.querySelector('[title="Scroll to highlight"]').addEventListener('click', () => scrollToHighlight(h.id));
-
-      // Delete
       card.querySelector('[title="Delete"]').addEventListener('click', async () => {
         await deleteHighlight(h.id);
-        // Remove span from DOM
-        const span = document.querySelector(`.wpn-highlight[data-id="${h.id}"]`);
-        if (span) {
+        // Unwrap ALL <mark> fragments for this id (multi-para = multiple marks)
+        document.querySelectorAll(`.wpn-highlight[data-id="${h.id}"]`).forEach(span => {
           const parent = span.parentNode;
           while (span.firstChild) parent.insertBefore(span.firstChild, span);
           span.remove();
-        }
+        });
         chrome.runtime.sendMessage({ action: 'refreshBadge' });
         updateFloatBtnBadge();
         renderSidebarHighlights();
         showWpnToast('Highlight deleted');
       });
 
-      // Click to scroll
       card.addEventListener('click', e => {
         if (!e.target.closest('.wpn-hl-action-btn')) scrollToHighlight(h.id);
       });
@@ -747,7 +736,8 @@
     const el = document.querySelector(`.wpn-highlight[data-id="${id}"]`);
     if (!el) { showWpnToast('Highlight not found on page'); return; }
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    highlightFlash(el);
+    // Flash all fragments that belong to this highlight
+    document.querySelectorAll(`.wpn-highlight[data-id="${id}"]`).forEach(highlightFlash);
   }
 
   function colorHex(color) {
@@ -780,7 +770,7 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.action === 'toggleSidebar') toggleSidebar();
     if (msg.action === 'saveHighlightFromContext') {
-      pendingHighlightRange = null; // context menu won't have range
+      pendingHighlightRange = null;
       showHighlightDialog(msg.text, true);
     }
   });

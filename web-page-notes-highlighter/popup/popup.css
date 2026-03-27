@@ -213,6 +213,7 @@ textarea::placeholder {
   border-radius: 3px;
   opacity: 0.85;
 }
+body.dark .hl-item{ background-color: #fff; }
 
 /* ── Buttons ── */
 .action-buttons {

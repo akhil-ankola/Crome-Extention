@@ -1088,9 +1088,9 @@
         <div class="wpn-hl-card-meta">
           <span class="wpn-hl-card-date">${formatDate(h.createdAt)}</span>
           <div class="wpn-hl-card-actions">
-            <button class="wpn-hl-action-btn" title="Scroll to highlight">🎯</button>
-            <button class="wpn-hl-action-btn" title="Edit highlight">✏</button>
-            <button class="wpn-hl-action-btn" title="Delete">🗑</button>
+            <button class="wpn-hl-action-btn scroll--btn" title="Scroll to highlight">Find</button>
+            <button class="wpn-hl-action-btn edit--btn" title="Edit highlight">Edit</button>
+            <button class="wpn-hl-action-btn delete--btn" title="Delete">Delete</button>
           </div>
         </div>
         <!-- Inline edit panel (hidden by default) -->

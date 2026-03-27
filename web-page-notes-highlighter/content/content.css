@@ -467,13 +467,19 @@ mark.wpn-highlight,
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 13px;
-  padding: 2px 6px;
+  font-size: 11px;
+  padding: 4px 8px;
   border-radius: 4px;
   transition: background 0.12s;
   line-height: 1;
+  outline: none !important;
 }
-
+.wpn-hl-action-btn.scroll--btn{ background: #6c63ff; color: #fff; }
+.wpn-hl-action-btn.scroll--btn:hover, .wpn-hl-action-btn.scroll--btn:focus { background: #fff; color: #6c63ff; outline: 1px solid #6c63ff !important; }
+.wpn-hl-action-btn.edit--btn{ background: gray; color: #fff; }
+.wpn-hl-action-btn.edit--btn:hover, .wpn-hl-action-btn.edit--btn:focus { background: #fff; color: gray; outline: 1px solid gray !important ; }
+.wpn-hl-action-btn.delete--btn{ background: #cf3f6f; color: #fff; }
+.wpn-hl-action-btn.delete--btn:hover, .wpn-hl-action-btn.delete--btn:focus { background: #fff; color: #cf3f6f; outline: 1px solid #cf3f6f !important; }
 .wpn-hl-action-btn:hover { background: #f2f0ec; }
 
 /* ── Inline edit panel inside sidebar highlight card ─── */
@@ -567,6 +573,7 @@ mark.wpn-highlight,
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   border: 1px solid #6c63ff;
+  padding: 2px 5px;
 }
 
 .wpn-footer-link:hover, .wpn-footer-link:focus { background-color: #6c63ff; outline: none; }
@@ -610,6 +617,14 @@ mark.wpn-highlight,
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(108,99,255,0.15);
 }
+.wpn-io-btn:focus {
+  outline: none;
+  border-color: #6c63ff;
+  color: #6c63ff;
+  background: #ede9ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(108,99,255,0.15);
+}
 
 .wpn-io-icon { font-size: 14px; }
 
@@ -646,6 +661,14 @@ body.wpn-dark .wpn-hl-card-text { color: #f0ece6; }
 body.wpn-dark .wpn-io-section { background: #222120; border-color: #2e2c2a; }
 body.wpn-dark .wpn-io-btn     { background: #2e2c2a; border-color: #3a3836; color: #f0ece6; }
 body.wpn-dark .wpn-io-btn:hover { background: #2a2660; border-color: #6c63ff; color: #a5b4fc; }
+
+body.wpn-dark .wpn-sidebar-title { color: #f0ece6; }
+body.wpn-dark .wpn-hl-card-text[style="background:#86efac"]{ background: #07730c !important; color: #fff; }
+body.wpn-dark .wpn-hl-card-text[style="background:#f9a8d4"]{ background: #9f295d !important; color: #fff; }
+body.wpn-dark .wpn-hl-card-text[style="background:#fdba74"]{ background: #ac5629 !important; color: #fff; }
+body.wpn-dark .wpn-hl-card-text[style="background:#93c5fd"]{ background: #6366f1 !important; color: #fff; }
+body.wpn-dark .wpn-hl-card-text[style="background:#ffd60a"]{ background: #9b8100 !important; color: #fff; }
+
 
 /* ── Sidebar page push ──────────────────────────────────── */
 body.wpn-sidebar-open {

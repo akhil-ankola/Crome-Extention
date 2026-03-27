@@ -2,7 +2,24 @@
 (function () {
   'use strict';
 
-  const PAGE_URL = location.href.split('#')[0];
+  // Stable storage key: strip hash, query-string params (WordPress adds
+  // ?doing_wp_cron, ?ver, UTM tags etc.), and normalise trailing slash.
+  // This ensures the same page always maps to the same storage key
+  // regardless of how WordPress/plugins modify the URL between visits.
+  function buildPageKey(href) {
+    try {
+      const u = new URL(href);
+      // Keep only origin + pathname, normalised (no trailing slash except root)
+      let path = u.origin + u.pathname;
+      if (path.length > u.origin.length + 1 && path.endsWith('/')) {
+        path = path.slice(0, -1);
+      }
+      return path;
+    } catch (_) {
+      return href.split('#')[0].split('?')[0];
+    }
+  }
+  const PAGE_URL = buildPageKey(location.href);
   let sidebarOpen = false;
   let selectionBubble = null;
   let tooltip = null;
@@ -144,9 +161,77 @@
   }
 
   // ── Highlight Restoration ──────────────────────────────────
+  //
+  // Problem: many sites (WordPress/Elementor, React SPAs, lazy-loaders)
+  // inject their content AFTER document_idle fires. If we only try once
+  // at init time the text nodes we need don't exist yet, so indexOf()
+  // finds nothing and the highlights appear gone after every refresh.
+  //
+  // Solution: three-layer approach
+  //  1. Try immediately at init (catches static / server-rendered pages).
+  //  2. Retry at 500 ms, 1 s, 2 s, 4 s (catches delayed injections).
+  //  3. MutationObserver: any time new nodes land in the DOM, re-run
+  //     only the highlights that haven't been found yet (cheap — stops
+  //     as soon as all highlights are present).
+
   async function restoreHighlights() {
     const highlights = await getHighlights();
-    highlights.forEach(h => applyHighlightToDOM(h));
+    if (!highlights.length) return;
+
+    // Track which IDs are still missing from the DOM
+    const pending = new Set(highlights.map(h => h.id));
+
+    function tryApply() {
+      if (!pending.size) return; // all done
+
+      for (const h of highlights) {
+        if (!pending.has(h.id)) continue;            // already applied
+
+        // Check if already in DOM (e.g. from a previous attempt)
+        if (document.querySelector(`.wpn-highlight[data-id="${h.id}"]`)) {
+          pending.delete(h.id);
+          continue;
+        }
+
+        applyHighlightToDOM(h);
+
+        // If it appeared now, mark as done
+        if (document.querySelector(`.wpn-highlight[data-id="${h.id}"]`)) {
+          pending.delete(h.id);
+        }
+      }
+    }
+
+    // ── Attempt 1: immediate ────────────────────────────────
+    tryApply();
+    if (!pending.size) return;
+
+    // ── Attempt 2-5: timed retries (500ms, 1s, 2s, 4s) ────
+    const DELAYS = [500, 1000, 2000, 4000];
+    for (const delay of DELAYS) {
+      await new Promise(r => setTimeout(r, delay));
+      tryApply();
+      if (!pending.size) {
+        return;
+      }
+    }
+
+    // ── Attempt 6: MutationObserver fallback ───────────────
+    // For sites that keep injecting content (infinite scroll, SPAs).
+    // Observes the entire body for subtree changes and retries on each
+    // batch of mutations. Disconnects once all highlights are restored
+    // or after 30 seconds to avoid running forever.
+    if (!pending.size) return;
+
+    const observer = new MutationObserver(() => {
+      tryApply();
+      if (!pending.size) observer.disconnect();
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Safety disconnect after 30 s regardless
+    setTimeout(() => observer.disconnect(), 30000);
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -310,15 +395,104 @@
 
   function normaliseWS(str) { return str.replace(/\s+/g, ' '); }
 
+  // ── XPath helpers ─────────────────────────────────────────
+  // XPath lets us pin-point a text node by its position in the DOM tree.
+  // This survives page refreshes because Elementor/WordPress always renders
+  // the same DOM structure even though text arrives asynchronously.
+
+  function getXPath(node) {
+    // Returns an absolute XPath string for a text node or element.
+    if (!node) return '';
+    const parts = [];
+    let current = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+    while (current && current !== document.body && current.nodeType === Node.ELEMENT_NODE) {
+      let idx = 1;
+      let sib = current.previousElementSibling;
+      while (sib) { if (sib.tagName === current.tagName) idx++; sib = sib.previousElementSibling; }
+      parts.unshift(current.tagName.toLowerCase() + '[' + idx + ']');
+      current = current.parentNode;
+    }
+    return '//' + parts.join('/');
+  }
+
+  function getTextNodeIndex(textNode) {
+    // Which text-node child of its parent is this? (0-based)
+    let idx = 0;
+    let sib = textNode.previousSibling;
+    while (sib) { if (sib.nodeType === Node.TEXT_NODE) idx++; sib = sib.previousSibling; }
+    return idx;
+  }
+
+  function resolveXPathTextNode(xpath, textNodeIndex) {
+    // Walk back from XPath to the specific text node
+    try {
+      const result = document.evaluate(
+        xpath, document.body, null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE, null
+      );
+      const el = result.singleNodeValue;
+      if (!el) return null;
+      let idx = 0;
+      for (const child of el.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          if (idx === textNodeIndex) return child;
+          idx++;
+        }
+      }
+      return null;
+    } catch (_) { return null; }
+  }
+
+  // Called right after the user creates a highlight — enriches the stored
+  // object with XPath anchors so restore can find it even after a refresh.
+  function addXPathAnchor(highlight, range) {
+    try {
+      const sc = range.startContainer;
+      const ec = range.endContainer;
+      highlight.anchor = {
+        startXPath:     getXPath(sc),
+        startTextIdx:   getTextNodeIndex(sc),
+        startOffset:    range.startOffset,
+        endXPath:       getXPath(ec),
+        endTextIdx:     getTextNodeIndex(ec),
+        endOffset:      range.endOffset,
+      };
+    } catch (_) { /* anchor enrichment is best-effort */ }
+  }
+
+  // Try to restore from XPath anchor (fast, exact, Elementor-safe)
+  function applyHighlightFromAnchor(h) {
+    if (!h.anchor) return false;
+    try {
+      const { startXPath, startTextIdx, startOffset,
+              endXPath,   endTextIdx,   endOffset } = h.anchor;
+      const startNode = resolveXPathTextNode(startXPath, startTextIdx);
+      const endNode   = resolveXPathTextNode(endXPath,   endTextIdx);
+      if (!startNode || !endNode) return false;
+
+      const range = document.createRange();
+      range.setStart(startNode, Math.min(startOffset, startNode.length));
+      range.setEnd(endNode,     Math.min(endOffset,   endNode.length));
+      if (range.collapsed) return false;
+
+      highlightLiveRange(range, h.id, h.color, h.note);
+      // Verify something was actually marked
+      return !!document.querySelector(`.wpn-highlight[data-id="${h.id}"]`);
+    } catch (_) { return false; }
+  }
+
   function applyHighlightToDOM(h) {
     if (!h.text || !h.text.trim()) return;
 
+    // ── Strategy 1: XPath anchor (exact, layout-independent) ─
+    if (h.anchor && applyHighlightFromAnchor(h)) return;
+
+    // ── Strategy 2: text-search fallback ─────────────────────
     const nodes = getAllContentTextNodes();
     if (nodes.length === 0) return;
 
-    // Build a flat text string + position map
     let flatText = '';
-    const map    = [];   // map[i] = {node, offset} | null (synthetic separator)
+    const map    = [];
 
     for (const node of nodes) {
       const val = node.nodeValue;
@@ -326,7 +500,6 @@
         map.push({ node, offset: i });
         flatText += val[i];
       }
-      // Virtual separator represents whitespace between nodes (paragraph breaks)
       flatText += ' ';
       map.push(null);
     }
@@ -336,15 +509,13 @@
     const idx      = haystack.indexOf(needle);
     if (idx === -1) return;
 
-    const endIdx = idx + needle.length; // exclusive
+    const endIdx = idx + needle.length;
 
-    // Resolve start: first real entry at or after idx
     let si = idx;
     while (si < map.length && map[si] === null) si++;
     if (si >= map.length) return;
     const startEntry = map[si];
 
-    // Resolve end: last real entry before endIdx
     let ei = endIdx - 1;
     while (ei >= 0 && map[ei] === null) ei--;
     if (ei < 0) return;
@@ -356,7 +527,7 @@
       range.setEnd(endEntry.node,     endEntry.offset + 1);
       highlightLiveRange(range, h.id, h.color, h.note);
     } catch (err) {
-      console.warn('[WPN] applyHighlightToDOM range error:', err);
+      console.warn('[WPN] applyHighlightToDOM error:', err);
     }
   }
 
@@ -559,6 +730,11 @@
     let succeeded = false;
 
     if (pendingHighlightRange) {
+      // Enrich with XPath anchor BEFORE the range is consumed.
+      // This gives the restore engine a precise location to jump back to
+      // on the next page load — independent of text search.
+      addXPathAnchor(highlight, pendingHighlightRange);
+
       // PRIMARY: use the exact live Range from the user's selection
       succeeded = highlightLiveRange(pendingHighlightRange, id, color, note);
       pendingHighlightRange = null;

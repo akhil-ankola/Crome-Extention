@@ -506,6 +506,7 @@ mark.wpn-highlight,
   padding: 5px 10px;
   border-radius: 5px;
   transition: 0.3s;
+  padding: .2rem 0.5rem;
 }
 
 .wpn-footer-link:hover, .wpn-footer-link:focus { background-color: #6c63ff; outline: none; color: #fff; }

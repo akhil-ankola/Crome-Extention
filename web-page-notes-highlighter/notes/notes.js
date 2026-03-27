@@ -7,7 +7,8 @@
   // ── State ──────────────────────────────────────────────────
   let allNotes = {};
   let allHighlights = {};
-  let editingUrl = null;
+  let editingUrl       = null;
+  let editingHighlight = null;   // { url, id } of the highlight being edited
   let activeTab = 'notes';
   let searchTerm = '';
 
@@ -254,12 +255,14 @@
         <div class="hl-card-source">${sanitize(truncate(h.url, 60))}</div>
         <div class="hl-card-meta">${Storage.formatDate(h.createdAt)}</div>
         <div class="hl-card-actions">
-          <button class="card-btn accent" data-url="${sanitize(h.url)}">🔗 Open Page</button>
-          <button class="card-btn danger" data-url="${sanitize(h.url)}" data-id="${sanitize(h.id)}">🗑 Delete</button>
+          <button class="card-btn accent"  data-action="open">🔗 Open Page</button>
+          <button class="card-btn"         data-action="edit">✏ Edit</button>
+          <button class="card-btn danger"  data-action="delete">🗑 Delete</button>
         </div>
       `;
-      card.querySelector('[data-url].accent').addEventListener('click', () => chrome.tabs.create({ url: h.url }));
-      card.querySelector('.danger').addEventListener('click', async () => {
+      card.querySelector('[data-action="open"]').addEventListener('click',   () => chrome.tabs.create({ url: h.url }));
+      card.querySelector('[data-action="edit"]').addEventListener('click',   () => openHlEditModal(h.url, h.id));
+      card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
         if (!confirm('Delete this highlight?')) return;
         await Storage.deleteHighlight(h.url, h.id);
         await loadData();
@@ -296,6 +299,86 @@
     closeModal();
     await loadData();
     showToast('Note updated ✓');
+  });
+
+  // ── Highlight Edit Modal ────────────────────────────────────
+
+  const colorHexMap = {
+    yellow: '#ffd60a', green: '#86efac', blue: '#93c5fd',
+    pink: '#f9a8d4', orange: '#fdba74'
+  };
+  let hlEditColor = 'yellow';
+
+  function openHlEditModal(url, id) {
+    const hls = allHighlights[url] || [];
+    const h   = hls.find(x => x.id === id);
+    if (!h) return;
+
+    editingHighlight = { url, id };
+    hlEditColor      = h.color || 'yellow';
+
+    // Populate preview
+    const preview = document.getElementById('hlModalPreview');
+    preview.textContent  = h.text.length > 200 ? h.text.slice(0, 200) + '…' : h.text;
+    preview.style.background = colorHexMap[hlEditColor] || '#ffd60a';
+
+    // Populate note
+    document.getElementById('hlModalNote').value = h.note || '';
+
+    // Set active colour dot
+    document.querySelectorAll('.hl-color-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.color === hlEditColor);
+    });
+
+    document.getElementById('hlEditModal').style.display = 'flex';
+    document.getElementById('hlModalNote').focus();
+  }
+
+  function closeHlModal() {
+    document.getElementById('hlEditModal').style.display = 'none';
+    editingHighlight = null;
+  }
+
+  // Colour selection
+  document.querySelectorAll('.hl-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.hl-color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      hlEditColor = btn.dataset.color;
+      // Live-update the preview chip colour
+      document.getElementById('hlModalPreview').style.background =
+        colorHexMap[hlEditColor] || '#ffd60a';
+    });
+  });
+
+  document.getElementById('hlModalClose').addEventListener('click',  closeHlModal);
+  document.getElementById('hlModalCancel').addEventListener('click', closeHlModal);
+  document.getElementById('hlEditModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('hlEditModal')) closeHlModal();
+  });
+
+  document.getElementById('hlModalSave').addEventListener('click', async () => {
+    if (!editingHighlight) return;
+    const { url, id } = editingHighlight;
+    const newNote     = document.getElementById('hlModalNote').value.trim();
+    const newColor    = hlEditColor;
+
+    // Update in storage
+    const hls = allHighlights[url] || [];
+    const idx  = hls.findIndex(h => h.id === id);
+    if (idx !== -1) {
+      hls[idx] = { ...hls[idx], note: newNote, color: newColor };
+      allHighlights[url] = hls;
+      // Persist via Storage util
+      const all = await new Promise(r => chrome.storage.local.get('highlights', r));
+      const updated = all.highlights || {};
+      updated[url]  = hls;
+      await new Promise(r => chrome.storage.local.set({ highlights: updated }, r));
+    }
+
+    closeHlModal();
+    await loadData();
+    showToast('Highlight updated ✓');
   });
 
   // ── Search ─────────────────────────────────────────────────

@@ -149,7 +149,7 @@
     </main>
   </div>
 
-  <!-- Edit Modal -->
+  <!-- Edit Note Modal -->
   <div id="editModal" class="modal-overlay" style="display:none">
     <div class="modal">
       <div class="modal-header">
@@ -161,6 +161,38 @@
       <div class="modal-actions">
         <button class="mbtn secondary" id="modalCancel">Cancel</button>
         <button class="mbtn primary" id="modalSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Highlight Modal -->
+  <div id="hlEditModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">✏ Edit Highlight</h2>
+        <button class="modal-close" id="hlModalClose">✕</button>
+      </div>
+
+      <!-- Highlighted text preview -->
+      <div class="hl-modal-preview" id="hlModalPreview"></div>
+
+      <!-- Note field -->
+      <label class="hl-modal-label">Note</label>
+      <textarea id="hlModalNote" class="modal-textarea" style="height:100px" placeholder="Add or edit note…"></textarea>
+
+      <!-- Colour picker -->
+      <label class="hl-modal-label" style="margin-top:12px;display:block">Colour</label>
+      <div class="hl-modal-colors" id="hlModalColors">
+        <button class="hl-color-btn" data-color="yellow" style="background:#ffd60a"></button>
+        <button class="hl-color-btn" data-color="green"  style="background:#86efac"></button>
+        <button class="hl-color-btn" data-color="blue"   style="background:#93c5fd"></button>
+        <button class="hl-color-btn" data-color="pink"   style="background:#f9a8d4"></button>
+        <button class="hl-color-btn" data-color="orange" style="background:#fdba74"></button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="mbtn secondary" id="hlModalCancel">Cancel</button>
+        <button class="mbtn primary"   id="hlModalSave">Save Changes</button>
       </div>
     </div>
   </div>

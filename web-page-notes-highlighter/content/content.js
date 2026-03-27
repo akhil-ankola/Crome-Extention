@@ -132,6 +132,17 @@
     await safeStorageSet({ highlights: all });
   }
 
+  async function updateHighlight(id, changes) {
+    // Merges `changes` (e.g. { note, color }) into the stored highlight object.
+    const d   = await safeStorageGet('highlights', {});
+    const all = d.highlights || {};
+    if (!all[PAGE_URL]) return;
+    const idx = all[PAGE_URL].findIndex(h => h.id === id);
+    if (idx === -1) return;
+    all[PAGE_URL][idx] = { ...all[PAGE_URL][idx], ...changes };
+    await safeStorageSet({ highlights: all });
+  }
+
   async function getSettings() {
     const d = await safeStorageGet('settings', {});
     return d.settings || { theme: 'light' };
@@ -923,19 +934,91 @@
           <span class="wpn-hl-card-date">${formatDate(h.createdAt)}</span>
           <div class="wpn-hl-card-actions">
             <button class="wpn-hl-action-btn" title="Scroll to highlight">🎯</button>
+            <button class="wpn-hl-action-btn" title="Edit highlight">✏</button>
             <button class="wpn-hl-action-btn" title="Delete">🗑</button>
+          </div>
+        </div>
+        <!-- Inline edit panel (hidden by default) -->
+        <div class="wpn-hl-edit-panel" style="display:none">
+          <div class="wpn-hl-edit-label">Note</div>
+          <textarea class="wpn-hl-edit-textarea" placeholder="Add or edit note…">${sanitize(h.note || '')}</textarea>
+          <div class="wpn-hl-edit-label" style="margin-top:8px">Colour</div>
+          <div class="wpn-hl-color-row">
+            ${['yellow','green','blue','pink','orange'].map(c =>
+              `<button class="wpn-hl-color-dot${c === (h.color||'yellow') ? ' active' : ''}" data-color="${c}" style="background:${colorHex(c)}" title="${c}"></button>`
+            ).join('')}
+          </div>
+          <div class="wpn-hl-edit-actions">
+            <button class="wpn-sbtn secondary wpn-hl-cancel-btn">Cancel</button>
+            <button class="wpn-sbtn primary wpn-hl-save-btn">Save</button>
           </div>
         </div>
       `;
 
-      card.querySelector('[title="Scroll to highlight"]').addEventListener('click', () => scrollToHighlight(h.id));
-      card.querySelector('[title="Delete"]').addEventListener('click', async () => {
+      // Scroll to
+      card.querySelector('[title="Scroll to highlight"]').addEventListener('click', e => {
+        e.stopPropagation();
+        scrollToHighlight(h.id);
+      });
+
+      // ── Edit button — toggle inline panel ──────────────────
+      const editBtn   = card.querySelector('[title="Edit highlight"]');
+      const editPanel = card.querySelector('.wpn-hl-edit-panel');
+      const textarea  = card.querySelector('.wpn-hl-edit-textarea');
+      let editColor   = h.color || 'yellow';
+
+      editBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const open = editPanel.style.display !== 'none';
+        editPanel.style.display = open ? 'none' : 'block';
+        if (!open) textarea.focus();
+      });
+
+      // Colour dot selection inside edit panel
+      card.querySelectorAll('.wpn-hl-color-dot').forEach(dot => {
+        dot.addEventListener('click', e => {
+          e.stopPropagation();
+          card.querySelectorAll('.wpn-hl-color-dot').forEach(d => d.classList.remove('active'));
+          dot.classList.add('active');
+          editColor = dot.dataset.color;
+        });
+      });
+
+      // Cancel
+      card.querySelector('.wpn-hl-cancel-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        editPanel.style.display = 'none';
+        textarea.value = h.note || '';
+        editColor = h.color || 'yellow';
+      });
+
+      // Save
+      card.querySelector('.wpn-hl-save-btn').addEventListener('click', async e => {
+        e.stopPropagation();
+        const newNote  = textarea.value.trim();
+        const newColor = editColor;
+
+        await updateHighlight(h.id, { note: newNote, color: newColor });
+
+        // Update live <mark> elements on the page
+        document.querySelectorAll(`.wpn-highlight[data-id="${h.id}"]`).forEach(mark => {
+          mark.dataset.note  = newNote;
+          mark.dataset.color = newColor;
+          mark.style.background = colorHex(newColor);
+        });
+
+        showWpnToast('Highlight updated ✓');
+        renderSidebarHighlights();  // re-render to reflect changes
+      });
+
+      // ── Delete ─────────────────────────────────────────────
+      card.querySelector('[title="Delete"]').addEventListener('click', async e => {
+        e.stopPropagation();
         await deleteHighlight(h.id);
-        // Unwrap ALL <mark> fragments for this id (multi-para = multiple marks)
-        document.querySelectorAll(`.wpn-highlight[data-id="${h.id}"]`).forEach(span => {
-          const parent = span.parentNode;
-          while (span.firstChild) parent.insertBefore(span.firstChild, span);
-          span.remove();
+        document.querySelectorAll(`.wpn-highlight[data-id="${h.id}"]`).forEach(mark => {
+          const parent = mark.parentNode;
+          while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+          mark.remove();
         });
         safeSendMessage({ action: 'refreshBadge' });
         updateFloatBtnBadge();
@@ -943,8 +1026,11 @@
         showWpnToast('Highlight deleted');
       });
 
+      // Click on card body (not action buttons) = scroll to highlight
       card.addEventListener('click', e => {
-        if (!e.target.closest('.wpn-hl-action-btn')) scrollToHighlight(h.id);
+        if (!e.target.closest('.wpn-hl-action-btn') && !e.target.closest('.wpn-hl-edit-panel')) {
+          scrollToHighlight(h.id);
+        }
       });
 
       list.appendChild(card);

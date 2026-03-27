@@ -846,7 +846,27 @@
           <div class="wpn-section-label">Highlights <span id="wpn-hl-badge" style="background:#ede9ff;color:#6c63ff;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;margin-left:4px">0</span></div>
           <div class="wpn-hl-list" id="wpn-hl-list"></div>
         </div>
+
+        <!-- ── Import / Export for this page ── -->
+        <div class="wpn-io-section">
+          <div class="wpn-section-label" style="margin-bottom:10px">
+            Export / Import — This Page
+          </div>
+          <div class="wpn-io-btns">
+            <button class="wpn-io-btn" id="wpn-export-page" title="Download notes & highlights for this page as JSON">
+              <span class="wpn-io-icon">📤</span>
+              <span>Export Page</span>
+            </button>
+            <button class="wpn-io-btn" id="wpn-import-page" title="Import notes & highlights from a JSON file">
+              <span class="wpn-io-icon">📥</span>
+              <span>Import File</span>
+            </button>
+          </div>
+          <div class="wpn-io-status" id="wpn-io-status" style="display:none"></div>
+          <input type="file" id="wpn-import-file-input" accept=".json" style="display:none" />
+        </div>
       </div>
+
       <div class="wpn-sidebar-footer">
         <button class="wpn-footer-link" id="wpn-view-all">View All Notes</button>
         <button class="wpn-footer-link" id="wpn-open-settings">Settings</button>
@@ -858,8 +878,143 @@
 
   function bindSidebarEvents() {
     document.getElementById('wpn-sidebar-close').addEventListener('click', closeSidebar);
-    document.getElementById('wpn-view-all').addEventListener('click', () => safeSendMessage({ action: 'openNotesPage' }));
+    document.getElementById('wpn-view-all').addEventListener('click',      () => safeSendMessage({ action: 'openNotesPage' }));
     document.getElementById('wpn-open-settings').addEventListener('click', () => safeSendMessage({ action: 'openOptions' }));
+
+    // ── Export this page ────────────────────────────────────
+    document.getElementById('wpn-export-page').addEventListener('click', exportPageData);
+
+    // ── Import file ─────────────────────────────────────────
+    document.getElementById('wpn-import-page').addEventListener('click', () => {
+      document.getElementById('wpn-import-file-input').click();
+    });
+    document.getElementById('wpn-import-file-input').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) importPageData(file);
+      e.target.value = ''; // reset so same file can be re-selected
+    });
+  }
+
+  // ── Show status message inside sidebar ─────────────────────
+  function showIOStatus(msg, type = 'success') {
+    const el = document.getElementById('wpn-io-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.className   = 'wpn-io-status wpn-io-' + type;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+
+  // ── Export: current page notes + highlights → JSON download ─
+  async function exportPageData() {
+    const note       = await getNote();
+    const highlights = await getHighlights();
+
+    if (!note && highlights.length === 0) {
+      showIOStatus('Nothing to export on this page.', 'warn');
+      return;
+    }
+
+    const payload = {
+      _version:    '1.0',
+      _type:       'page-notes-export',
+      _exportedAt: new Date().toISOString(),
+      _pageUrl:    PAGE_URL,
+      _pageTitle:  document.title,
+      notes:       note       ? { [PAGE_URL]: note }       : {},
+      highlights:  highlights.length ? { [PAGE_URL]: highlights } : {}
+    };
+
+    const json     = JSON.stringify(payload, null, 2);
+    const blob     = new Blob([json], { type: 'application/json' });
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement('a');
+    const slug     = PAGE_URL.replace(/https?:\/\//, '').replace(/[^a-z0-9]/gi, '-').slice(0, 40);
+    a.href         = url;
+    a.download     = `page-notes-${slug}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const noteCount = note ? 1 : 0;
+    showIOStatus(`✓ Exported ${noteCount} note, ${highlights.length} highlight(s).`, 'success');
+  }
+
+  // ── Import: read JSON file → merge into current page storage ─
+  async function importPageData(file) {
+    showIOStatus('Reading file…', 'info');
+
+    let data;
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch (_) {
+      showIOStatus('✕ Invalid JSON file.', 'error');
+      return;
+    }
+
+    // Validate structure
+    if (!data || (!data.notes && !data.highlights)) {
+      showIOStatus('✕ File format not recognised.', 'error');
+      return;
+    }
+
+    // Count what is in the file
+    const incomingNotes = data.notes      || {};
+    const incomingHl    = data.highlights || {};
+    let   noteCount = 0, hlCount = 0;
+    Object.values(incomingNotes).forEach(() => noteCount++);
+    Object.values(incomingHl).forEach(arr => hlCount += Array.isArray(arr) ? arr.length : 0);
+
+    if (noteCount === 0 && hlCount === 0) {
+      showIOStatus('⚠ File contains no data.', 'warn');
+      return;
+    }
+
+    // Merge into storage — existing data wins on key conflict for notes,
+    // highlights are de-duplicated by id
+    const d          = await safeStorageGet(['notes', 'highlights'], {});
+    const allNotes   = d.notes      || {};
+    const allHl      = d.highlights || {};
+
+    // Merge notes: imported wins if newer
+    for (const [url, n] of Object.entries(incomingNotes)) {
+      if (!allNotes[url] ||
+          (n.updatedAt && n.updatedAt > (allNotes[url].updatedAt || ''))) {
+        allNotes[url] = n;
+      }
+    }
+
+    // Merge highlights: skip duplicates by id
+    for (const [url, hls] of Object.entries(incomingHl)) {
+      if (!Array.isArray(hls)) continue;
+      if (!allHl[url]) {
+        allHl[url] = hls;
+      } else {
+        const existingIds = new Set(allHl[url].map(h => h.id));
+        const newOnes     = hls.filter(h => !existingIds.has(h.id));
+        allHl[url]        = [...allHl[url], ...newOnes];
+      }
+    }
+
+    await safeStorageSet({ notes: allNotes, highlights: allHl });
+
+    showIOStatus(`✓ Imported ${noteCount} note, ${hlCount} highlight(s). Restoring…`, 'success');
+
+    // Re-render sidebar and re-apply any newly imported highlights to DOM
+    await loadSidebarData();
+    const importedHlsForPage = incomingHl[PAGE_URL] || [];
+    importedHlsForPage.forEach(h => {
+      // Only apply if not already in DOM
+      if (!document.querySelector(`.wpn-highlight[data-id="${h.id}"]`)) {
+        applyHighlightToDOM(h);
+      }
+    });
+
+    updateFloatBtnBadge();
+    safeSendMessage({ action: 'refreshBadge' });
   }
 
   function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }

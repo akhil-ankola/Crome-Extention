@@ -476,6 +476,70 @@ mark.wpn-highlight,
 
 .wpn-hl-action-btn:hover { background: #f2f0ec; }
 
+/* ── Inline edit panel inside sidebar highlight card ─── */
+.wpn-hl-edit-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e4e1da;
+  animation: wpn-fade-in 0.15s ease;
+}
+
+@keyframes wpn-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wpn-hl-edit-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9e9b97;
+  margin-bottom: 5px;
+}
+
+.wpn-hl-edit-textarea {
+  width: 100%;
+  height: 68px;
+  border: 1.5px solid #e4e1da;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  color: #1a1814;
+  resize: none;
+  outline: none;
+  background: #f9f8f6;
+  transition: border-color 0.15s;
+}
+
+.wpn-hl-edit-textarea:focus { border-color: #6c63ff; background: white; }
+
+.wpn-hl-color-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wpn-hl-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  padding: 0;
+}
+
+.wpn-hl-color-dot:hover  { transform: scale(1.15); }
+.wpn-hl-color-dot.active { border-color: #1a1814; transform: scale(1.1); }
+
+.wpn-hl-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .wpn-empty-state {
   text-align: center;
   padding: 20px;
@@ -503,13 +567,67 @@ mark.wpn-highlight,
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   border: 1px solid #6c63ff;
-  padding: 5px 10px;
-  border-radius: 5px;
-  transition: 0.3s;
-  padding: .2rem 0.5rem;
 }
 
-.wpn-footer-link:hover, .wpn-footer-link:focus { background-color: #6c63ff; outline: none; color: #fff; }
+.wpn-footer-link:hover, .wpn-footer-link:focus { background-color: #6c63ff; outline: none; }
+
+/* ── Sidebar Import / Export section ────────────────────── */
+.wpn-io-section {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: #f2f0ec;
+  border-radius: 10px;
+  border: 1px solid #e4e1da;
+}
+
+.wpn-io-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.wpn-io-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1.5px solid #e4e1da;
+  border-radius: 5px;
+  background: white;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a1814;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wpn-io-btn:hover {
+  border-color: #6c63ff;
+  color: #6c63ff;
+  background: #ede9ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(108,99,255,0.15);
+}
+
+.wpn-io-icon { font-size: 14px; }
+
+/* Status message */
+.wpn-io-status {
+  margin-top: 9px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.wpn-io-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.wpn-io-error   { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+.wpn-io-warn    { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.wpn-io-info    { background: #ede9ff; color: #6c63ff; border: 1px solid #c4b5fd; }
 
 /* Dark mode sidebar */
 body.wpn-dark #wpn-sidebar,
@@ -524,6 +642,10 @@ body.wpn-dark .wpn-sidebar-note-area textarea,
 body.wpn-dark .wpn-hl-card { background: #222120; border-color: #2e2c2a; color: #f0ece6; }
 body.wpn-dark .wpn-sbtn.secondary { background: #2e2c2a; color: #9e9b97; }
 body.wpn-dark .wpn-hl-card-text { color: #f0ece6; }
+
+body.wpn-dark .wpn-io-section { background: #222120; border-color: #2e2c2a; }
+body.wpn-dark .wpn-io-btn     { background: #2e2c2a; border-color: #3a3836; color: #f0ece6; }
+body.wpn-dark .wpn-io-btn:hover { background: #2a2660; border-color: #6c63ff; color: #a5b4fc; }
 
 /* ── Sidebar page push ──────────────────────────────────── */
 body.wpn-sidebar-open {
